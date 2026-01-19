@@ -1,0 +1,11 @@
+{
+    "model": "Vision Transformer (ViT)",
+    "image_size": 224,
+    "classes": [
+        "Diseased",
+        "Healthy"
+    ],
+    "accuracy": "100% on test set",
+    "framework": "PyTorch + HuggingFace",
+    "use_case": "Cattle Disease Detection"
+}

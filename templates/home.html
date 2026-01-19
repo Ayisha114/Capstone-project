@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('app_name') }} - {{ t('tagline') }}{% endblock %}
+
+{% block content %}
+<!-- Language Selector -->
+<div class="language-selector">
+    <select id="languageSelect" onchange="changeLanguage(this.value)" class="language-dropdown">
+        <option value="en" {% if lang == 'en' %}selected{% endif %}>English</option>
+        <option value="hi" {% if lang == 'hi' %}selected{% endif %}>हिंदी (Hindi)</option>
+        <option value="ta" {% if lang == 'ta' %}selected{% endif %}>தமிழ் (Tamil)</option>
+        <option value="kn" {% if lang == 'kn' %}selected{% endif %}>ಕನ್ನಡ (Kannada)</option>
+    </select>
+</div>
+
+<!-- Hero Section with Unsplash Image -->
+<section class="hero" style="background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://images.unsplash.com/photo-1613408857068-6d231d0c6875?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1920') center/cover no-repeat;">
+    <div class="container">
+        <div class="hero-content">
+            <h1 class="hero-title animate-fade-in">
+                {{ t('hero_title') }}
+            </h1>
+            <p class="hero-subtitle animate-fade-in-delay">
+                {{ t('hero_subtitle') }}
+            </p>
+            <div class="hero-buttons animate-fade-in-delay-2">
+                <a href="{{ url_for('upload') }}?lang={{ lang }}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-upload"></i> {{ t('get_started') }}
+                </a>
+                <a href="#features" class="btn btn-secondary btn-lg">
+                    <i class="fas fa-info-circle"></i> {{ t('learn_more') }}
+                </a>
+            </div>
+        </div>
+        <div class="hero-stats">
+            <div class="stat-card">
+                <i class="fas fa-check-circle"></i>
+                <h3 id="totalScans">0</h3>
+                <p>{{ t('total_reports') }}</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-percentage"></i>
+                <h3>95%</h3>
+                <p>{{ t('confidence') }}</p>
+            </div>
+            <div class="stat-card">
+                <i class="fas fa-clock"></i>
+                <h3>&lt;2s</h3>
+                <p>{{ t('analyzing') }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section id="features" class="features-section">
+    <div class="container">
+        <h2 class="section-title">{{ t('features') }}</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-brain"></i>
+                </div>
+                <h3>{{ t('feature_1_title') }}</h3>
+                <p>{{ t('feature_1_desc') }}</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <h3>{{ t('feature_2_title') }}</h3>
+                <p>{{ t('feature_2_desc') }}</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-globe"></i>
+                </div>
+                <h3>{{ t('feature_3_title') }}</h3>
+                <p>{{ t('feature_3_desc') }}</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-pills"></i>
+                </div>
+                <h3>{{ t('feature_4_title') }}</h3>
+                <p>{{ t('feature_4_desc') }}</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-mobile-alt"></i>
+                </div>
+                <h3>Mobile Friendly</h3>
+                <p>Access from any device - smartphone, tablet, or desktop.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h3>Analytics Dashboard</h3>
+                <p>Visualize trends and track disease patterns.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works Section -->
+<section class="how-it-works">
+    <div class="container">
+        <h2 class="section-title">How It Works</h2>
+        <div class="steps-grid">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <div class="step-icon">
+                    <i class="fas fa-camera"></i>
+                </div>
+                <h3>{{ t('upload_image') }}</h3>
+                <p>Take a clear photo of your cattle showing any symptoms or concerns.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <div class="step-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h3>AI Analysis</h3>
+                <p>Our advanced AI model analyzes the image in under 2 seconds.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <div class="step-icon">
+                    <i class="fas fa-file-medical"></i>
+                </div>
+                <h3>Get Results</h3>
+                <p>Receive instant diagnosis with confidence scores and treatment recommendations.</p>
+            </div>
+            <div class="step-card">
+                <div class="step-number">4</div>
+                <div class="step-icon">
+                    <i class="fas fa-user-md"></i>
+                </div>
+                <h3>{{ t('find_vet') }}</h3>
+                <p>Get connected with nearby veterinarians for professional care.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Disease Gallery Section -->
+<section class="disease-gallery">
+    <div class="container">
+        <h2 class="section-title">Detectable Diseases</h2>
+        <div class="disease-grid">
+            <div class="disease-card">
+                <img src="https://images.unsplash.com/photo-1706043904054-92f8347c1ef0?w=400" alt="Healthy Cattle">
+                <h3>{{ t('healthy') }}</h3>
+                <p>Normal, healthy cattle with no visible symptoms.</p>
+            </div>
+            <div class="disease-card">
+                <img src="https://images.unsplash.com/photo-1686333673758-a5fb00861a67?w=400" alt="Foot-and-Mouth Disease">
+                <h3>Foot-and-Mouth Disease</h3>
+                <p>Highly contagious viral disease affecting cloven-hoofed animals.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section">
+    <div class="container">
+        <h2>{{ t('welcome') }}</h2>
+        <p>Join thousands of farmers protecting their cattle with AI technology</p>
+        <a href="{{ url_for('upload') }}?lang={{ lang }}" class="btn btn-primary btn-lg">
+            <i class="fas fa-rocket"></i> {{ t('get_started') }}
+        </a>
+    </div>
+</section>
+
+<script>
+// Language switcher
+function changeLanguage(lang) {
+    window.location.href = '/?lang=' + lang;
+}
+
+// Animate stats counter
+function animateCounter(id, target) {
+    let current = 0;
+    const increment = target / 50;
+    const timer = setInterval(() => {
+        current += increment;
+        if (current >= target) {
+            current = target;
+            clearInterval(timer);
+        }
+        document.getElementById(id).textContent = Math.floor(current);
+    }, 30);
+}
+
+// Fetch and display total scans
+fetch('/api/stats')
+    .then(response => response.json())
+    .then(data => {
+        animateCounter('totalScans', data.total_reports || 0);
+    })
+    .catch(error => console.error('Error fetching stats:', error));
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+});
+</script>
+
+<style>
+.language-selector {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.language-dropdown {
+    padding: 10px 15px;
+    border: 2px solid var(--primary-color);
+    border-radius: 8px;
+    background: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+}
+
+.language-dropdown:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.hero {
+    min-height: 600px;
+    display: flex;
+    align-items: center;
+    color: white;
+    position: relative;
+    padding: 4rem 0;
+}
+
+.hero-content {
+    text-align: center;
+    max-width: 800px;
+    margin: 0 auto 3rem;
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.hero-subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    opacity: 0.95;
+}
+
+.hero-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn-lg {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+}
+
+.btn-secondary {
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    backdrop-filter: blur(10px);
+}
+
+.btn-secondary:hover {
+    background: white;
+    color: var(--primary-color);
+}
+
+.hero-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.stat-card {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    padding: 2rem;
+    border-radius: 1rem;
+    text-align: center;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.stat-card i {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.stat-card h3 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin: 0.5rem 0;
+}
+
+.features-section, .how-it-works, .disease-gallery {
+    padding: 5rem 0;
+}
+
+.section-title {
+    text-align: center;
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 3rem;
+    color: var(--dark);
+}
+
+.features-grid, .steps-grid, .disease-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.feature-card, .step-card, .disease-card {
+    background: white;
+    padding: 2rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: transform 0.3s, box-shadow 0.3s;
+    text-align: center;
+}
+
+.feature-card:hover, .step-card:hover, .disease-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+}
+
+.feature-icon, .step-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    font-size: 2rem;
+    color: white;
+}
+
+.step-number {
+    width: 50px;
+    height: 50px;
+    background: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 auto 1rem;
+}
+
+.disease-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.cta-section {
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+    color: white;
+    padding: 5rem 0;
+    text-align: center;
+}
+
+.cta-section h2 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+}
+
+.cta-section p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+    opacity: 0.9;
+}
+
+.animate-fade-in {
+    animation: fadeIn 1s ease-in;
+}
+
+.animate-fade-in-delay {
+    animation: fadeIn 1s ease-in 0.3s both;
+}
+
+.animate-fade-in-delay-2 {
+    animation: fadeIn 1s ease-in 0.6s both;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2rem;
+    }
+    
+    .hero-subtitle {
+        font-size: 1.1rem;
+    }
+    
+    .language-selector {
+        top: 70px;
+        right: 10px;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,655 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('admin') }} - {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+{% if login_page %}
+<!-- Login Page -->
+<section class="login-section">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-lock"></i>
+                <h2>{{ t('admin') }} {{ t('login') }}</h2>
+                <p>Access the dashboard</p>
+            </div>
+            <form method="POST" action="{{ url_for('admin_login') }}">
+                <div class="form-group">
+                    <label for="username">
+                        <i class="fas fa-user"></i> {{ t('username') }}
+                    </label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">
+                        <i class="fas fa-key"></i> {{ t('password') }}
+                    </label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fas fa-sign-in-alt"></i> {{ t('login') }}
+                </button>
+            </form>
+            <p class="login-hint">Default: admin / admin123</p>
+        </div>
+    </div>
+</section>
+{% else %}
+<!-- Dashboard -->
+<section class="dashboard-section">
+    <div class="container">
+        <div class="dashboard-header">
+            <div>
+                <h1><i class="fas fa-chart-line"></i> {{ t('admin') }} Dashboard</h1>
+                <p>Monitor and analyze cattle health diagnostics</p>
+            </div>
+            <div class="header-actions">
+                <select id="dashboardLang" onchange="changeLanguage(this.value)" class="language-dropdown">
+                    <option value="en" {% if lang == 'en' %}selected{% endif %}>English</option>
+                    <option value="hi" {% if lang == 'hi' %}selected{% endif %}>हिंदी</option>
+                    <option value="ta" {% if lang == 'ta' %}selected{% endif %}>தமிழ்</option>
+                    <option value="kn" {% if lang == 'kn' %}selected{% endif %}>ಕನ್ನಡ</option>
+                </select>
+                <a href="{{ url_for('admin_logout') }}" class="btn btn-secondary">
+                    <i class="fas fa-sign-out-alt"></i> {{ t('logout') }}
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card-large">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <i class="fas fa-file-medical"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>{{ total_reports }}</h3>
+                    <p>{{ t('total_reports') }}</p>
+                    <div class="stat-trend">
+                        <i class="fas fa-arrow-up"></i> +12% this month
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card-large">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="diseaseCount">0</h3>
+                    <p>{{ t('disease_detected') }}</p>
+                    <div class="stat-trend danger">
+                        <i class="fas fa-arrow-down"></i> -5% this month
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card-large">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="stat-info">
+                    <h3 id="healthyCount">0</h3>
+                    <p>{{ t('healthy') }}</p>
+                    <div class="stat-trend success">
+                        <i class="fas fa-arrow-up"></i> +8% this month
+                    </div>
+                </div>
+            </div>
+
+            <div class="stat-card-large">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <div class="stat-info">
+                    <h3>{{ avg_confidence }}%</h3>
+                    <p>{{ t('avg_confidence') }}</p>
+                    <div class="stat-trend">
+                        <i class="fas fa-equals"></i> Stable
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h3><i class="fas fa-chart-bar"></i> {{ t('disease_distribution') }}</h3>
+                    <select id="chartType" onchange="updateChartType(this.value)" class="chart-selector">
+                        <option value="bar">Bar Chart</option>
+                        <option value="pie">Pie Chart</option>
+                        <option value="doughnut">Doughnut Chart</option>
+                    </select>
+                </div>
+                <canvas id="diseaseChart"></canvas>
+            </div>
+
+            <div class="chart-card">
+                <h3><i class="fas fa-chart-line"></i> {{ t('recent_diagnoses') }}</h3>
+                <canvas id="timelineChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Monthly Trends Chart -->
+        <div class="chart-card-full">
+            <h3><i class="fas fa-calendar-alt"></i> Monthly Trends</h3>
+            <canvas id="monthlyChart"></canvas>
+        </div>
+
+        <!-- Recent Reports Table -->
+        <div class="table-card">
+            <div class="table-header">
+                <h3><i class="fas fa-list"></i> {{ t('recent_diagnoses') }}</h3>
+                <div class="table-actions">
+                    <input type="text" id="searchTable" placeholder="{{ t('search') }}..." class="search-input">
+                    <button class="btn btn-sm btn-primary" onclick="location.reload()">
+                        <i class="fas fa-sync"></i> Refresh
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table" id="reportsTable">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>{{ t('prediction') }}</th>
+                            <th>{{ t('confidence') }}</th>
+                            <th>{{ t('cattle_id') }}</th>
+                            <th>{{ t('location') }}</th>
+                            <th>{{ t('date') }}</th>
+                            <th>{{ t('actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportsTableBody">
+                        <!-- Populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if not login_page %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let diseaseChart, timelineChart, monthlyChart;
+let currentChartType = 'bar';
+
+// Language switcher
+function changeLanguage(lang) {
+    window.location.href = '/admin?lang=' + lang;
+}
+
+// Fetch stats and populate dashboard
+async function loadDashboard() {
+    try {
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+
+        // Update counters
+        const diseaseCount = Object.entries(data.by_disease)
+            .filter(([disease]) => disease !== 'Healthy')
+            .reduce((sum, [, count]) => sum + count, 0);
+        
+        const healthyCount = data.by_disease['Healthy'] || 0;
+        
+        document.getElementById('diseaseCount').textContent = diseaseCount;
+        document.getElementById('healthyCount').textContent = healthyCount;
+
+        // Create charts
+        createDiseaseChart(data.by_disease);
+        createTimelineChart(data.daily_reports);
+        createMonthlyChart(data.monthly_reports);
+        
+        // Load recent reports
+        loadRecentReports();
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+}
+
+// Create disease distribution chart
+function createDiseaseChart(diseaseData) {
+    const ctx = document.getElementById('diseaseChart').getContext('2d');
+    
+    const labels = Object.keys(diseaseData);
+    const values = Object.values(diseaseData);
+    const colors = [
+        '#667eea', '#f093fb', '#4facfe', '#43e97b', 
+        '#fa709a', '#fee140', '#30cfd0', '#a8edea'
+    ];
+
+    if (diseaseChart) diseaseChart.destroy();
+
+    diseaseChart = new Chart(ctx, {
+        type: currentChartType,
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Cases',
+                data: values,
+                backgroundColor: colors,
+                borderColor: colors.map(c => c + 'cc'),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: currentChartType !== 'bar',
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.parsed + ' cases';
+                        }
+                    }
+                }
+            },
+            scales: currentChartType === 'bar' ? {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            } : {}
+        }
+    });
+}
+
+// Update chart type
+function updateChartType(type) {
+    currentChartType = type;
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => createDiseaseChart(data.by_disease));
+}
+
+// Create timeline chart
+function createTimelineChart(dailyData) {
+    const ctx = document.getElementById('timelineChart').getContext('2d');
+    
+    const labels = dailyData.map(d => d[0]).reverse();
+    const values = dailyData.map(d => d[1]).reverse();
+
+    if (timelineChart) timelineChart.destroy();
+
+    timelineChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Daily Reports',
+                data: values,
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Create monthly chart
+function createMonthlyChart(monthlyData) {
+    const ctx = document.getElementById('monthlyChart').getContext('2d');
+    
+    const labels = monthlyData.map(d => d[0]).reverse();
+    const values = monthlyData.map(d => d[1]).reverse();
+
+    if (monthlyChart) monthlyChart.destroy();
+
+    monthlyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Monthly Reports',
+                data: values,
+                backgroundColor: 'rgba(67, 233, 123, 0.8)',
+                borderColor: '#43e97b',
+                borderWidth: 2,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Load recent reports
+async function loadRecentReports() {
+    try {
+        const response = await fetch('/api/reports?limit=10');
+        const data = await response.json();
+        const tableBody = document.getElementById('reportsTableBody');
+        tableBody.innerHTML = '';
+
+        (data.reports || []).forEach(report => {
+            const row = document.createElement('tr');
+            const cattleId = report.cattle_id_hash || '-';
+            const reportId = report.id_hash || report.id;
+
+            row.innerHTML = `
+                <td>#${reportId}</td>
+                <td>${report.prediction}</td>
+                <td>${report.confidence}%</td>
+                <td>${cattleId}</td>
+                <td>${report.location || '-'}</td>
+                <td>${new Date(report.timestamp).toLocaleString()}</td>
+                <td>
+                    <a class="btn btn-sm btn-secondary" href="/download_pdf/${report.id}">
+                        <i class="fas fa-file-pdf"></i>
+                    </a>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error loading reports:', error);
+    }
+}
+
+// Search table
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchTable');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('#reportsTableBody tr');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+    
+    // Load dashboard
+    loadDashboard();
+});
+</script>
+
+<style>
+.dashboard-section {
+    background: #f8f9fa;
+    min-height: 100vh;
+    padding: 2rem 0;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.dashboard-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--dark);
+    margin: 0;
+}
+
+.dashboard-header p {
+    color: #6c757d;
+    margin: 0.5rem 0 0 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card-large {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.stat-card-large:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.12);
+}
+
+.stat-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.stat-info h3 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin: 0;
+    color: var(--dark);
+}
+
+.stat-info p {
+    color: #6c757d;
+    margin: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+.stat-trend {
+    font-size: 0.85rem;
+    color: #667eea;
+    margin-top: 0.5rem;
+}
+
+.stat-trend.success {
+    color: #43e97b;
+}
+
+.stat-trend.danger {
+    color: #f5576c;
+}
+
+.charts-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.chart-card, .chart-card-full {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.chart-card-full {
+    margin-bottom: 2rem;
+}
+
+.chart-card h3, .chart-card-full h3 {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--dark);
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.chart-selector {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.table-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.table-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.search-input {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    min-width: 200px;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th {
+    background: #f8f9fa;
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--dark);
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.data-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.data-table tr:hover {
+    background: #f8f9fa;
+}
+
+.login-section {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.login-card {
+    background: white;
+    border-radius: 1rem;
+    padding: 3rem;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    max-width: 400px;
+    width: 100%;
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-header i {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.login-hint {
+    text-align: center;
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+    .charts-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+</style>
+{% endif %}
+{% endblock %}

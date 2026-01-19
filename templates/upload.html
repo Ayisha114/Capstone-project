@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+
+{% block title %}Diagnose - Cattle Disease Detection{% endblock %}
+
+{% block content %}
+<section class="upload-section">
+    <div class="container">
+        <div class="upload-header">
+            <h1><i class="fas fa-stethoscope"></i> Cattle Disease Diagnosis</h1>
+            <p>Upload an image of your cattle for instant AI-powered health analysis</p>
+        </div>
+
+        <div class="upload-container">
+            <div class="upload-area" id="uploadArea">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="drop-zone" id="dropZone">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <h3>Drag & Drop Image Here</h3>
+                        <p>or</p>
+                        <label for="fileInput" class="btn btn-primary">
+                            <i class="fas fa-folder-open"></i> Browse Files
+                        </label>
+                        <input type="file" id="fileInput" name="file" accept="image/*" hidden>
+                        <p class="file-info">Supported: JPG, PNG, GIF (Max 16MB)</p>
+                    </div>
+
+                    <div class="image-preview" id="imagePreview" style="display: none;">
+                        <img id="previewImage" src="" alt="Preview">
+                        <button type="button" class="btn-remove" id="removeImage">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="form-details" id="formDetails" style="display: none;">
+                        <div class="form-group">
+                            <label for="cattleId">
+                                <i class="fas fa-tag"></i> Cattle ID (Optional)
+                            </label>
+                            <input type="text" id="cattleId" name="cattle_id" placeholder="e.g., COW-001">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="location">
+                                <i class="fas fa-map-marker-alt"></i> Location (Optional)
+                            </label>
+                            <input type="text" id="location" name="location" placeholder="e.g., Farm A, Barn 2">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="notes">
+                                <i class="fas fa-notes-medical"></i> Additional Notes (Optional)
+                            </label>
+                            <textarea id="notes" name="notes" rows="3" placeholder="Describe any symptoms or observations..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg btn-block" id="analyzeBtn">
+                            <i class="fas fa-microscope"></i> Analyze Image
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-container" id="resultsContainer" style="display: none;">
+                <div class="results-header">
+                    <h2><i class="fas fa-clipboard-check"></i> Diagnosis Results</h2>
+                </div>
+
+                <div class="result-card">
+                    <div class="result-main">
+                        <div class="result-icon" id="resultIcon">
+                            <i class="fas fa-heartbeat"></i>
+                        </div>
+                        <div class="result-info">
+                            <h3 id="resultDisease">-</h3>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" id="confidenceFill"></div>
+                            </div>
+                            <p class="confidence-text">
+                                Confidence: <span id="resultConfidence">0</span>%
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="result-details" id="resultDetails">
+                        <!-- Detailed probabilities will be inserted here -->
+                    </div>
+
+                    <div class="result-recommendations" id="resultRecommendations" style="display: none;">
+                        <h4 id="treatmentLabel">Treatment Recommendations</h4>
+                        <p id="treatmentText">-</p>
+                        <h4 id="precautionLabel">Precautions</h4>
+                        <p id="precautionText">-</p>
+                    </div>
+
+                    <div class="result-actions">
+                        <button class="btn btn-secondary" id="viewReportBtn">
+                            <i class="fas fa-file-alt"></i> View Full Report
+                        </button>
+                        <button class="btn btn-secondary" id="downloadPdfBtn">
+                            <i class="fas fa-file-pdf"></i> Download PDF Report
+                        </button>
+                        <button class="btn btn-primary" id="newAnalysisBtn">
+                            <i class="fas fa-plus"></i> New Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Analyzing image...</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadForm = document.getElementById('uploadForm');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewImage = document.getElementById('previewImage');
+    const removeImage = document.getElementById('removeImage');
+    const formDetails = document.getElementById('formDetails');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const newAnalysisBtn = document.getElementById('newAnalysisBtn');
+    const viewReportBtn = document.getElementById('viewReportBtn');
+    const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    const treatmentLabel = document.getElementById('treatmentLabel');
+    const precautionLabel = document.getElementById('precautionLabel');
+
+    let currentReportId = null;
+    const treatmentLabelText = "{{ t('treatment') }}";
+    const precautionLabelText = "{{ t('precaution') }}";
+    const downloadPdfLabelText = "{{ t('download_pdf') }}";
+
+    // Drag and drop handlers
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.add('drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => {
+            dropZone.classList.remove('drag-over');
+        });
+    });
+
+    dropZone.addEventListener('drop', handleDrop);
+    fileInput.addEventListener('change', handleFileSelect);
+    removeImage.addEventListener('click', resetUpload);
+    uploadForm.addEventListener('submit', handleSubmit);
+    newAnalysisBtn.addEventListener('click', resetUpload);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFileSelect();
+        }
+    }
+
+    function handleFileSelect() {
+        const file = fileInput.files[0];
+        if (file) {
+            if (file.size > 16 * 1024 * 1024) {
+                alert('File size must be less than 16MB');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                dropZone.style.display = 'none';
+                imagePreview.style.display = 'block';
+                formDetails.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function resetUpload() {
+        fileInput.value = '';
+        previewImage.src = '';
+        dropZone.style.display = 'flex';
+        imagePreview.style.display = 'none';
+        formDetails.style.display = 'none';
+        resultsContainer.style.display = 'none';
+        document.getElementById('cattleId').value = '';
+        document.getElementById('location').value = '';
+        document.getElementById('notes').value = '';
+    }
+
+    async function handleSubmit(e) {
+        e.preventDefault();
+
+        const formData = new FormData(uploadForm);
+        
+        loadingOverlay.style.display = 'flex';
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                currentReportId = data.report_id;
+                displayResults(data);
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error occurred'));
+            }
+        } catch (error) {
+            alert('Error uploading image: ' + error.message);
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    }
+
+    function displayResults(data) {
+        const resultDisease = document.getElementById('resultDisease');
+        const resultConfidence = document.getElementById('resultConfidence');
+        const confidenceFill = document.getElementById('confidenceFill');
+        const resultIcon = document.getElementById('resultIcon');
+        const resultDetails = document.getElementById('resultDetails');
+        const resultRecommendations = document.getElementById('resultRecommendations');
+        const treatmentText = document.getElementById('treatmentText');
+        const precautionText = document.getElementById('precautionText');
+
+        resultDisease.textContent = data.prediction;
+        resultConfidence.textContent = data.confidence;
+        confidenceFill.style.width = data.confidence + '%';
+
+        // Set color based on confidence
+        if (data.confidence >= 80) {
+            confidenceFill.style.background = 'linear-gradient(90deg, #10b981, #059669)';
+        } else if (data.confidence >= 60) {
+            confidenceFill.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+        } else {
+            confidenceFill.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+        }
+
+        // Set icon based on result
+        if (data.prediction.toLowerCase().includes('healthy')) {
+            resultIcon.innerHTML = '<i class="fas fa-check-circle"></i>';
+            resultIcon.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        } else {
+            resultIcon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            resultIcon.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        }
+
+        // Display all probabilities
+        let detailsHTML = '<h4>Detailed Analysis:</h4><div class="probability-list">';
+        const sortedProbs = Object.entries(data.all_probabilities)
+            .sort((a, b) => b[1] - a[1]);
+
+        sortedProbs.forEach(([disease, prob]) => {
+            detailsHTML += `
+                <div class="probability-item">
+                    <span class="disease-name">${disease}</span>
+                    <div class="prob-bar">
+                        <div class="prob-fill" style="width: ${prob}%"></div>
+                    </div>
+                    <span class="prob-value">${prob.toFixed(2)}%</span>
+                </div>
+            `;
+        });
+        detailsHTML += '</div>';
+        resultDetails.innerHTML = detailsHTML;
+
+        if (data.treatment || data.precaution) {
+            treatmentLabel.textContent = treatmentLabelText;
+            precautionLabel.textContent = precautionLabelText;
+            treatmentText.textContent = data.treatment || '-';
+            precautionText.textContent = data.precaution || '-';
+            resultRecommendations.style.display = 'block';
+        } else {
+            resultRecommendations.style.display = 'none';
+        }
+
+        resultsContainer.style.display = 'block';
+        resultsContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    viewReportBtn.addEventListener('click', () => {
+        if (currentReportId) {
+            window.location.href = '/reports';
+        }
+    });
+
+    downloadPdfBtn.addEventListener('click', () => {
+        if (currentReportId) {
+            window.location.href = `/download_pdf/${currentReportId}`;
+        }
+    });
+
+    downloadPdfBtn.innerHTML = `<i class="fas fa-file-pdf"></i> ${downloadPdfLabelText}`;
+</script>
+{% endblock %}

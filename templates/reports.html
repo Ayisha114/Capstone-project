@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Cattle Disease Detection{% endblock %}
+
+{% block content %}
+<section class="reports-section">
+    <div class="container">
+        <div class="reports-header">
+            <h1><i class="fas fa-file-medical"></i> Diagnosis Reports</h1>
+            <p>View and manage all cattle health diagnosis records</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search by cattle ID, location, or disease...">
+            </div>
+            <div class="filter-group">
+                <select id="diseaseFilter" class="filter-select">
+                    <option value="">All Diseases</option>
+                </select>
+                <select id="sortFilter" class="filter-select">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="confidence-high">Highest Confidence</option>
+                    <option value="confidence-low">Lowest Confidence</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Reports Grid -->
+        <div class="reports-grid" id="reportsGrid">
+            {% if reports %}
+                {% for report in reports %}
+                <div class="report-card" 
+                     data-disease="{{ report.prediction }}" 
+                     data-cattle-id="{{ report.cattle_id_hash }}"
+                     data-location="{{ report.location }}"
+                     data-confidence="{{ report.confidence }}"
+                     data-timestamp="{{ report.timestamp }}">
+                    <div class="report-image">
+                        <img src="{{ report.web_path }}" 
+                             alt="{{ report.prediction }}"
+                             loading="lazy">
+                        <div class="report-badge {% if 'healthy' in report.prediction.lower() %}badge-success{% else %}badge-danger{% endif %}">
+                            {{ report.prediction }}
+                        </div>
+                    </div>
+                    <div class="report-content">
+                        <div class="report-meta">
+                            <span class="report-id">
+                                <i class="fas fa-hashtag"></i> {{ report.id_hash }}
+                            </span>
+                            <span class="report-date">
+                                <i class="fas fa-calendar"></i> {{ report.timestamp[:10] }}
+                            </span>
+                        </div>
+                        
+                        {% if report.cattle_id %}
+                        <div class="report-info">
+                            <i class="fas fa-tag"></i>
+                            <span>Cattle ID: {{ report.cattle_id_hash }}</span>
+                        </div>
+                        {% endif %}
+
+                        {% if report.location %}
+                        <div class="report-info">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span>{{ report.location }}</span>
+                        </div>
+                        {% endif %}
+
+                        <div class="confidence-indicator">
+                            <span>Confidence:</span>
+                            <div class="confidence-bar-small">
+                                <div class="confidence-fill-small" style="width: {{ report.confidence }}%"></div>
+                            </div>
+                            <span class="confidence-value">{{ report.confidence }}%</span>
+                        </div>
+
+                        {% if report.notes %}
+                        <div class="report-notes">
+                            <i class="fas fa-notes-medical"></i>
+                            <p>{{ report.notes[:100] }}{% if report.notes|length > 100 %}...{% endif %}</p>
+                        </div>
+                        {% endif %}
+
+                        <div class="report-actions">
+                            <button class="btn btn-sm btn-primary view-details" data-id="{{ report.id }}">
+                                <i class="fas fa-eye"></i> View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-folder-open"></i>
+                    <h3>No Reports Yet</h3>
+                    <p>Start by uploading your first cattle image for diagnosis</p>
+                    <a href="{{ url_for('upload') }}" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Upload Image
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="no-results" id="noResults" style="display: none;">
+            <i class="fas fa-search"></i>
+            <h3>No Results Found</h3>
+            <p>Try adjusting your search or filters</p>
+        </div>
+    </div>
+</section>
+
+<!-- Report Detail Modal -->
+<div class="modal" id="reportModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-file-medical-alt"></i> Report Details</h2>
+            <button class="modal-close" id="closeModal">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <!-- Content loaded dynamically -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const searchInput = document.getElementById('searchInput');
+    const diseaseFilter = document.getElementById('diseaseFilter');
+    const sortFilter = document.getElementById('sortFilter');
+    const reportsGrid = document.getElementById('reportsGrid');
+    const noResults = document.getElementById('noResults');
+    const reportCards = document.querySelectorAll('.report-card');
+    const modal = document.getElementById('reportModal');
+    const modalBody = document.getElementById('modalBody');
+    const closeModal = document.getElementById('closeModal');
+
+    // Populate disease filter
+    const diseases = new Set();
+    reportCards.forEach(card => {
+        diseases.add(card.dataset.disease);
+    });
+    diseases.forEach(disease => {
+        const option = document.createElement('option');
+        option.value = disease;
+        option.textContent = disease;
+        diseaseFilter.appendChild(option);
+    });
+
+    // Filter and search functionality
+    function filterReports() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const selectedDisease = diseaseFilter.value;
+        let visibleCount = 0;
+
+        let cardsArray = Array.from(reportCards);
+
+        // Sort
+        const sortValue = sortFilter.value;
+        cardsArray.sort((a, b) => {
+            switch(sortValue) {
+                case 'newest':
+                    return new Date(b.dataset.timestamp) - new Date(a.dataset.timestamp);
+                case 'oldest':
+                    return new Date(a.dataset.timestamp) - new Date(b.dataset.timestamp);
+                case 'confidence-high':
+                    return parseFloat(b.dataset.confidence) - parseFloat(a.dataset.confidence);
+                case 'confidence-low':
+                    return parseFloat(a.dataset.confidence) - parseFloat(b.dataset.confidence);
+            }
+        });
+
+        // Clear and re-append sorted cards
+        reportsGrid.innerHTML = '';
+        cardsArray.forEach(card => reportsGrid.appendChild(card));
+
+        // Filter
+        cardsArray.forEach(card => {
+            const disease = card.dataset.disease;
+            const cattleId = card.dataset.cattleId.toLowerCase();
+            const location = card.dataset.location.toLowerCase();
+
+            const matchesSearch = cattleId.includes(searchTerm) || 
+                                 location.includes(searchTerm) || 
+                                 disease.toLowerCase().includes(searchTerm);
+            const matchesDisease = !selectedDisease || disease === selectedDisease;
+
+            if (matchesSearch && matchesDisease) {
+                card.style.display = 'block';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+
+    searchInput.addEventListener('input', filterReports);
+    diseaseFilter.addEventListener('change', filterReports);
+    sortFilter.addEventListener('change', filterReports);
+
+    // View details
+    document.querySelectorAll('.view-details').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const reportId = this.dataset.id;
+            
+            try {
+                const response = await fetch(`/report/${reportId}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error loading report');
+                    return;
+                }
+
+                const healthStatus = data.prediction.toLowerCase().includes('healthy') ? 'Healthy' : 'Requires Attention';
+                const statusClass = data.prediction.toLowerCase().includes('healthy') ? 'status-healthy' : 'status-warning';
+
+                modalBody.innerHTML = `
+                    <div class="modal-report">
+                        <div class="modal-image">
+                            <img src="${data.web_path || data.filepath}" alt="${data.prediction}">
+                        </div>
+                        <div class="modal-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Report ID:</span>
+                                <span class="detail-value">#${data.id_hash || data.id}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Diagnosis:</span>
+                                <span class="detail-value diagnosis-value">${data.prediction}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Confidence:</span>
+                                <span class="detail-value">${data.confidence}%</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Status:</span>
+                                <span class="detail-value ${statusClass}">${healthStatus}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Date:</span>
+                                <span class="detail-value">${new Date(data.timestamp).toLocaleString()}</span>
+                            </div>
+                            ${data.cattle_id_hash ? `
+                            <div class="detail-row">
+                                <span class="detail-label">Cattle ID:</span>
+                                <span class="detail-value">${data.cattle_id_hash}</span>
+                            </div>
+                            ` : ''}
+                            ${data.location ? `
+                            <div class="detail-row">
+                                <span class="detail-label">Location:</span>
+                                <span class="detail-value">${data.location}</span>
+                            </div>
+                            ` : ''}
+                            ${data.notes ? `
+                            <div class="detail-row">
+                                <span class="detail-label">Notes:</span>
+                                <span class="detail-value">${data.notes}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+                modal.style.display = 'flex';
+            } catch (error) {
+                alert('Error loading report details');
+            }
+        });
+    });
+
+    closeModal.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}
