@@ -88,6 +88,7 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.venv_run/
 env/
 venv/
 ENV/
@@ -135,6 +136,14 @@ Thumbs.db
 
 # Logs
 *.log
+run_stdout.log
+run_stderr.log
+
+# Local runtime/runtime-packages copied from local machine
+Lib/
+Scripts/
+share/
+app1.py
 
 # Model files (large files)
 # Uncomment if you don't want to track model files
