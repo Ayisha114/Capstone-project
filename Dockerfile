@@ -32,5 +32,6 @@ ENV PYTHONUNBUFFERED=1
 # Expose port
 EXPOSE 5000
 
-# Run the application (Render sets PORT) - use 2 workers to save memory
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 2 --timeout 120 app:app"]
+# Run the application (Render sets PORT). Keep a single worker to avoid
+# loading the large model multiple times in memory.
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --timeout 120 app:app"]
