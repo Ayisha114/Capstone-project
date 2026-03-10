@@ -1,3 +1,11 @@
+﻿---
+title: Cattle Disease Detector
+emoji: "🐄"
+colorFrom: green
+colorTo: blue
+sdk: docker
+app_port: 5000
+---
 # 🐄 Cattle Disease Detection System - Premium Edition
 
 ![Cattle Health AI](https://img.shields.io/badge/AI-Powered-blue)
@@ -498,3 +506,4 @@ For support, email support@cattlehealth.ai or open an issue on GitHub.
 ---
 
 🐄 **Protect Your Cattle with AI Technology** 🐄
+
