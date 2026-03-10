@@ -5,14 +5,21 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from PIL import Image
-import torch
-import torchvision.transforms as transforms
-from torchvision import models
 import hashlib
 from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+import threading
+
+# Keep thread usage low to reduce memory/CPU spikes on small instances
+os.environ.setdefault('OMP_NUM_THREADS', '1')
+os.environ.setdefault('MKL_NUM_THREADS', '1')
+os.environ.setdefault('NUMEXPR_NUM_THREADS', '1')
+
+torch = None
+transforms = None
+models = None
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
@@ -91,63 +98,102 @@ def normalize_prediction(label):
         return 'Diseased'
     return label
 
-# Load the trained model
+# Load the trained model lazily to keep startup fast on free instances
 MODEL_BACKEND = None
-try:
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+MODEL_LOADED = False
+MODEL_LOAD_ERROR = None
+model = None
+device = None
+transform = None
+_model_lock = threading.Lock()
 
-    model_path = os.environ.get('MODEL_PATH')
-    if not model_path:
-        int8_path = os.path.join('models', 'cattle_disease_vit_model_int8.pth')
-        model_path = int8_path if os.path.exists(int8_path) else os.path.join('models', 'cattle_disease_vit_model.pth')
 
-    state_dict = torch.load(model_path, map_location=device)
-    num_classes = len(class_names)
-    is_transformers = any(key.startswith('vit.') for key in state_dict.keys())
+def load_model():
+    global MODEL_BACKEND, MODEL_LOADED, MODEL_LOAD_ERROR, model, device, transform
+    global torch, transforms, models
 
-    if is_transformers:
-        from transformers import ViTConfig, ViTForImageClassification
+    if MODEL_LOADED:
+        return True
+    if MODEL_LOAD_ERROR:
+        return False
 
-        config = ViTConfig(
-            num_labels=num_classes,
-            image_size=model_config.get('image_size', 224),
-            num_channels=3
-        )
-        model = ViTForImageClassification(config)
-        MODEL_BACKEND = 'transformers'
-    else:
-        model = models.vit_b_16(weights=None)
-        model.heads = torch.nn.Linear(model.heads.head.in_features, num_classes)
-        MODEL_BACKEND = 'torchvision'
+    with _model_lock:
+        if MODEL_LOADED:
+            return True
+        if MODEL_LOAD_ERROR:
+            return False
 
-    if model_path.endswith('_int8.pth'):
-        # Quantized weights require a quantized model structure before loading.
-        model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+        try:
+            import torch  # noqa: F401
+            import torchvision.transforms as transforms  # noqa: F401
+            from torchvision import models  # noqa: F401
+        except Exception as e:
+            MODEL_LOAD_ERROR = f"torch/torchvision import failed: {e}"
+            print(f"WARNING: {MODEL_LOAD_ERROR}")
+            return False
 
-    model.load_state_dict(state_dict, strict=True)
-    model = model.to(device)
-    model.eval()
-    MODEL_LOADED = True
-except Exception as e:
-    print(f"WARNING: Model not loaded - {e}")
-    MODEL_LOADED = False
-    model = None
-    device = torch.device('cpu')
+        try:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# Image preprocessing
-image_size = model_config.get('image_size', 224)
-if MODEL_BACKEND == 'transformers':
-    normalize_mean = [0.5, 0.5, 0.5]
-    normalize_std = [0.5, 0.5, 0.5]
-else:
-    normalize_mean = [0.485, 0.456, 0.406]
-    normalize_std = [0.229, 0.224, 0.225]
+            model_path = os.environ.get('MODEL_PATH')
+            if not model_path:
+                int8_path = os.path.join('models', 'cattle_disease_vit_model_int8.pth')
+                model_path = int8_path if os.path.exists(int8_path) else os.path.join('models', 'cattle_disease_vit_model.pth')
 
-transform = transforms.Compose([
-    transforms.Resize((image_size, image_size)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=normalize_mean, std=normalize_std)
-])
+            state_dict = torch.load(model_path, map_location=device)
+            num_classes = len(class_names)
+            is_transformers = any(key.startswith('vit.') for key in state_dict.keys())
+
+            if is_transformers:
+                from transformers import ViTConfig, ViTForImageClassification
+
+                config = ViTConfig(
+                    num_labels=num_classes,
+                    image_size=model_config.get('image_size', 224),
+                    num_channels=3
+                )
+                model = ViTForImageClassification(config)
+                MODEL_BACKEND = 'transformers'
+            else:
+                model = models.vit_b_16(weights=None)
+                model.heads = torch.nn.Linear(model.heads.head.in_features, num_classes)
+                MODEL_BACKEND = 'torchvision'
+
+            if model_path.endswith('_int8.pth'):
+                # Quantized weights require a quantized model structure before loading.
+                model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+
+            model.load_state_dict(state_dict, strict=True)
+            model = model.to(device)
+            model.eval()
+
+            image_size = model_config.get('image_size', 224)
+            if MODEL_BACKEND == 'transformers':
+                normalize_mean = [0.5, 0.5, 0.5]
+                normalize_std = [0.5, 0.5, 0.5]
+            else:
+                normalize_mean = [0.485, 0.456, 0.406]
+                normalize_std = [0.229, 0.224, 0.225]
+
+            transform = transforms.Compose([
+                transforms.Resize((image_size, image_size)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=normalize_mean, std=normalize_std)
+            ])
+
+            MODEL_LOADED = True
+            return True
+        except Exception as e:
+            MODEL_LOAD_ERROR = str(e)
+            print(f"WARNING: Model not loaded - {MODEL_LOAD_ERROR}")
+            MODEL_LOADED = False
+            model = None
+            transform = None
+            try:
+                device = torch.device('cpu')
+            except Exception:
+                device = None
+            return False
 
 # Database initialization
 def init_db():
@@ -214,8 +260,11 @@ def hash_identifier(value):
 
 def predict_image(image_path):
     """Predict disease from image"""
-    if not MODEL_LOADED:
-        return {'error': 'Model not loaded. Please add trained model file.'}
+    if not load_model():
+        message = 'Model not loaded. Please add trained model file.'
+        if MODEL_LOAD_ERROR:
+            message = f"Model not loaded. {MODEL_LOAD_ERROR}"
+        return {'error': message}
     
     try:
         image = Image.open(image_path).convert('RGB')
@@ -325,6 +374,15 @@ def generate_pdf_report(report_data, lang='en'):
     p.save()
     buffer.seek(0)
     return buffer
+
+@app.route('/health')
+def health():
+    return jsonify({
+        'status': 'ok',
+        'model_loaded': MODEL_LOADED,
+        'model_error': MODEL_LOAD_ERROR
+    }), 200
+
 
 @app.route('/')
 def home():

@@ -5,9 +5,8 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     autoDeploy: true
+    healthCheckPath: /health
     envVars:
-      - key: PORT
-        value: 5000
       - key: SECRET_KEY
         generateValue: true
       - key: FLASK_ENV
